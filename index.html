@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#111827">
   <title>PhotoFrame Studio - 一括写真フチ付けアプリ</title>
   
-  <!-- PWA用 Web App Manifest (データURI埋め込み) -->
+  <!-- PWA用 Web App Manifest -->
   <link rel="manifest" href='data:application/manifest+json,{"name":"PhotoFrame Studio","short_name":"フチ付け","display":"standalone","background_color":"#111827","theme_color":"#111827","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect width=%27100%27 height=%27100%27 rx=%2722%27 fill=%27%23ffffff%27/%3E%3Crect x=%2716%27 y=%2716%27 width=%2768%27 height=%2768%27 rx=%2710%27 fill=%27%231f2937%27/%3E%3Ccircle cx=%2738%27 cy=%2738%27 r=%278%27 fill=%27%2360a5fa%27/%3E%3Cpath d=%27M22 72 L45 48 L62 64 L72 54 L80 72 Z%27 fill=%27%2334d399%27/%3E%3C/svg%3E","sizes":"192x192","type":"image/svg+xml"}]}'>
 
   <!-- Tailwind CSS & JSZip & Lucide Icons -->
@@ -24,7 +24,6 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans CJK JP", sans-serif;
       overscroll-behavior-y: none;
     }
-    /* チェッカーボード背景（透過や白フチを見やすくするため） */
     .bg-checkerboard {
       background-color: #18181b;
       background-image: 
@@ -35,225 +34,255 @@
       background-size: 20px 20px;
       background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
     }
-    /* スクロールバー非表示 */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    input[type="range"] {
-      accent-color: #3b82f6;
+    input[type="range"] { accent-color: #3b82f6; }
+
+    /* 縦画面（デフォルト）と 横画面・Foldメイン画面（ワイド時）の自動切り替え */
+    .workspace-layout {
+      display: flex;
+      flex-direction: column;
+    }
+    .control-sidebar {
+      max-height: 45dvh;
+      width: 100%;
+      border-top: 1px solid #1f2937;
+    }
+
+    /* 横向き または 折りたたみメイン画面（幅640px以上）では左右分割にする */
+    @media (orientation: landscape), (min-width: 640px) {
+      .workspace-layout {
+        flex-direction: row;
+      }
+      .control-sidebar {
+        max-height: none;
+        height: 100%;
+        width: 360px;
+        border-top: none;
+        border-left: 1px solid #1f2937;
+      }
+    }
+    @media (min-width: 960px) {
+      .control-sidebar {
+        width: 400px;
+      }
     }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 h-dvh flex flex-col overflow-hidden">
 
   <!-- ヘッダー -->
-  <header class="bg-gray-900/90 backdrop-blur border-b border-gray-800 px-4 py-2.5 flex items-center justify-between shrink-0 z-20">
+  <header class="bg-gray-900/95 backdrop-blur border-b border-gray-800 px-4 py-2 flex items-center justify-between shrink-0 z-20">
     <div class="flex items-center gap-2">
-      <div class="w-7 h-7 rounded-lg bg-white p-1 flex items-center justify-center shadow">
-        <div class="w-full h-full bg-gray-900 rounded-sm"></div>
+      <div class="w-6 h-6 rounded-md bg-white p-1 flex items-center justify-center shadow">
+        <div class="w-full h-full bg-gray-900 rounded-xs"></div>
       </div>
-      <h1 class="font-bold text-base tracking-tight">PhotoFrame <span class="text-xs font-normal text-blue-400 bg-blue-950/80 border border-blue-800 px-1.5 py-0.5 rounded">Studio</span></h1>
+      <h1 class="font-bold text-sm sm:text-base tracking-tight">PhotoFrame <span class="text-[11px] font-normal text-blue-400 bg-blue-950/80 border border-blue-800 px-1.5 py-0.5 rounded">Studio</span></h1>
     </div>
 
     <div class="flex items-center gap-2">
-      <label for="fileInput" class="cursor-pointer bg-gray-800 hover:bg-gray-700 active:scale-95 transition text-xs font-medium px-3 py-2 rounded-lg flex items-center gap-1.5 border border-gray-700">
+      <label for="fileInput" class="cursor-pointer bg-gray-800 hover:bg-gray-700 active:scale-95 transition text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-gray-700">
         <i data-lucide="image-plus" class="w-4 h-4 text-blue-400"></i>
         <span>写真を追加</span>
       </label>
       <input id="fileInput" type="file" accept="image/*" multiple class="hidden">
 
-      <button id="exportBtn" disabled class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-500 active:scale-95 transition text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-lg shadow-blue-900/20">
+      <button id="exportBtn" disabled class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-500 active:scale-95 transition text-xs font-semibold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-lg shadow-blue-900/20">
         <i data-lucide="download" class="w-4 h-4"></i>
         <span id="exportBtnText">一括保存</span>
       </button>
     </div>
   </header>
 
-  <!-- メインエリア（プレビュー＋サムネイル） -->
-  <main class="flex-1 flex flex-col min-h-0 relative bg-checkerboard">
-    
-    <!-- 未選択時の初期画面 -->
-    <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center p-6 z-10 bg-gray-950/90 backdrop-blur-sm">
-      <label for="fileInput" class="w-full max-w-md border-2 border-dashed border-gray-700 hover:border-blue-500 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition bg-gray-900/60 hover:bg-gray-900">
-        <div class="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-4 text-blue-400">
-          <i data-lucide="images" class="w-8 h-8"></i>
-        </div>
-        <p class="text-base font-bold text-white mb-1">写真をタップして選択（複数可）</p>
-        <p class="text-xs text-gray-400 mb-5">元の比率を保ったまま、等しい距離で綺麗なフチをつけます</p>
-        <span class="bg-blue-600 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow">カメラロール・フォルダから選ぶ</span>
-      </label>
-    </div>
+  <!-- ワークスペース全体（縦画面：上下分割 ／ 横画面・Fold展開時：左画像・右UI） -->
+  <div class="workspace-layout flex-1 min-h-0 min-w-0 overflow-hidden">
 
-    <!-- キャンバスプレビュー領域 -->
-    <div class="flex-1 flex items-center justify-center p-3 sm:p-6 min-h-0 relative overflow-hidden">
-      <canvas id="previewCanvas" class="max-w-full max-h-full object-contain shadow-2xl transition-opacity duration-150"></canvas>
+    <!-- 左側（縦画面では上側）：画像プレビュー＋サムネイル -->
+    <main class="flex-1 flex flex-col min-h-0 min-w-0 relative bg-checkerboard">
       
-      <!-- 画像情報バッジ -->
-      <div id="imageInfoBadge" class="hidden absolute top-3 left-3 bg-gray-900/80 backdrop-blur border border-gray-700/80 text-[11px] text-gray-300 px-2.5 py-1 rounded-md flex items-center gap-2">
-        <span id="infoResolution">-- × --</span>
-        <span class="text-gray-600">|</span>
-        <span id="infoIndex">1 / 1</span>
-      </div>
-
-      <!-- 全消去ボタン -->
-      <button id="clearAllBtn" class="hidden absolute top-3 right-3 bg-gray-900/80 hover:bg-red-950/90 text-gray-400 hover:text-red-300 backdrop-blur border border-gray-700/80 text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1 transition">
-        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-        <span>すべてクリア</span>
-      </button>
-    </div>
-
-    <!-- 複数枚のサムネイル一覧バー -->
-    <div id="thumbnailBar" class="hidden bg-gray-900/95 border-t border-gray-800 px-3 py-2 shrink-0">
-      <div id="thumbnailList" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-        <!-- JSでサムネイルを動的に挿入 -->
-      </div>
-    </div>
-  </main>
-
-  <!-- 下部コントロールパネル -->
-  <section class="bg-gray-900 border-t border-gray-800 shrink-0 z-20 flex flex-col max-h-[46dvh]">
-    
-    <!-- モード切替タブ -->
-    <div class="grid grid-cols-3 border-b border-gray-800 text-xs font-semibold bg-gray-950/50 shrink-0">
-      <button data-tab="color" class="tab-btn py-2.5 flex items-center justify-center gap-1.5 border-b-2 border-blue-500 text-blue-400 bg-gray-900/60">
-        <i data-lucide="palette" class="w-4 h-4"></i>
-        <span>フチの色・抽出</span>
-      </button>
-      <button data-tab="blur" class="tab-btn py-2.5 flex items-center justify-center gap-1.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
-        <i data-lucide="sparkles" class="w-4 h-4"></i>
-        <span>写真ぼかし</span>
-      </button>
-      <button data-tab="size" class="tab-btn py-2.5 flex items-center justify-center gap-1.5 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
-        <i data-lucide="Sliders" class="w-4 h-4"></i>
-        <span>フチ幅・比率・影</span>
-      </button>
-    </div>
-
-    <!-- コントロール内容 -->
-    <div class="p-4 overflow-y-auto space-y-4 text-xs">
-
-      <!-- 共通：フチの太さスライダー（常に表示） -->
-      <div class="bg-gray-800/60 border border-gray-800 rounded-xl p-3">
-        <div class="flex justify-between items-center mb-1.5">
-          <span class="font-semibold text-gray-200 flex items-center gap-1.5">
-            <i data-lucide="maximize-2" class="w-3.5 h-3.5 text-blue-400"></i>
-            フチの太さ（等距離）
-          </span>
-          <span id="borderWidthLabel" class="font-mono text-blue-400 font-bold">8%</span>
-        </div>
-        <input id="borderWidthSlider" type="range" min="0" max="35" step="0.5" value="8" class="w-full h-2 bg-gray-700 rounded-lg cursor-pointer">
-      </div>
-
-      <!-- タブ1：単色＆自動抽出5色 -->
-      <div id="tab-color" class="tab-panel space-y-3.5">
-        <div class="flex items-center justify-between gap-2">
-          <span class="text-gray-400 font-medium">定番カラー & 自由選択</span>
-          <div class="flex items-center gap-2">
-            <!-- 定番プリセット -->
-            <button data-color="#FFFFFF" class="preset-color-btn w-7 h-7 rounded-full bg-white border-2 border-blue-500 shadow ring-2 ring-blue-500/40" title="白 (#FFFFFF)"></button>
-            <button data-color="#F8FAFC" class="preset-color-btn w-7 h-7 rounded-full bg-slate-100 border border-gray-600" title="オフホワイト"></button>
-            <button data-color="#E5E5E5" class="preset-color-btn w-7 h-7 rounded-full bg-neutral-200 border border-gray-600" title="ライトグレー"></button>
-            <button data-color="#18181B" class="preset-color-btn w-7 h-7 rounded-full bg-zinc-900 border border-gray-600" title="ダークグレー"></button>
-            <button data-color="#000000" class="preset-color-btn w-7 h-7 rounded-full bg-black border border-gray-600" title="黒 (#000000)"></button>
-            
-            <!-- カラーピッカー -->
-            <label class="relative flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-tr from-pink-500 via-yellow-400 to-cyan-400 p-0.5 cursor-pointer shadow">
-              <span class="w-full h-full rounded-full bg-gray-900 flex items-center justify-center">
-                <i data-lucide="pipette" class="w-3.5 h-3.5 text-white"></i>
-              </span>
-              <input id="customColorPicker" type="color" value="#ffffff" class="sr-only">
-            </label>
+      <!-- 未選択時の初期画面 -->
+      <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center p-6 z-10 bg-gray-950/90 backdrop-blur-sm">
+        <label for="fileInput" class="w-full max-w-md border-2 border-dashed border-gray-700 hover:border-blue-500 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition bg-gray-900/60 hover:bg-gray-900">
+          <div class="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-3 text-blue-400">
+            <i data-lucide="images" class="w-7 h-7"></i>
           </div>
+          <p class="text-base font-bold text-white mb-1">写真をタップして選択（複数可）</p>
+          <p class="text-xs text-gray-400 mb-4">元の比率を保ったまま、等しい距離で綺麗なフチをつけます</p>
+          <span class="bg-blue-600 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow">カメラロール・フォルダから選ぶ</span>
+        </label>
+      </div>
+
+      <!-- キャンバスプレビュー領域（画面いっぱいに大きく表示） -->
+      <div id="previewContainer" class="flex-1 flex items-center justify-center p-2 sm:p-4 min-h-0 min-w-0 relative overflow-hidden">
+        <canvas id="previewCanvas" class="max-w-full max-h-full w-auto h-auto object-contain shadow-2xl transition-opacity duration-150"></canvas>
+        
+        <!-- 画像情報バッジ -->
+        <div id="imageInfoBadge" class="hidden absolute top-2.5 left-2.5 bg-gray-900/80 backdrop-blur border border-gray-700/80 text-[11px] text-gray-300 px-2.5 py-1 rounded-md flex items-center gap-2">
+          <span id="infoResolution">-- × --</span>
+          <span class="text-gray-600">|</span>
+          <span id="infoIndex">1 / 1</span>
         </div>
 
-        <!-- 写真から自動抽出した5色 -->
-        <div class="bg-gray-950/60 border border-gray-800/80 rounded-xl p-3 space-y-2">
-          <div class="flex items-center justify-between">
-            <span class="text-gray-300 font-medium flex items-center gap-1.5">
-              <i data-lucide="wand-2" class="w-3.5 h-3.5 text-amber-400"></i>
-              この写真から抽出した5色
+        <!-- 全消去ボタン -->
+        <button id="clearAllBtn" class="hidden absolute top-2.5 right-2.5 bg-gray-900/80 hover:bg-red-950/90 text-gray-400 hover:text-red-300 backdrop-blur border border-gray-700/80 text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1 transition">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          <span>すべてクリア</span>
+        </button>
+      </div>
+
+      <!-- 複数枚のサムネイル一覧バー -->
+      <div id="thumbnailBar" class="hidden bg-gray-900/95 border-t border-gray-800 px-3 py-1.5 shrink-0">
+        <div id="thumbnailList" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+          <!-- JSでサムネイルを動的に挿入 -->
+        </div>
+      </div>
+    </main>
+
+    <!-- 右側（縦画面では下側）：コントロールUIパネル -->
+    <section class="control-sidebar bg-gray-900 shrink-0 z-20 flex flex-col">
+      
+      <!-- モード切替タブ -->
+      <div class="grid grid-cols-3 border-b border-gray-800 text-xs font-semibold bg-gray-950/50 shrink-0">
+        <button data-tab="color" class="tab-btn py-2.5 flex items-center justify-center gap-1 border-b-2 border-blue-500 text-blue-400 bg-gray-900/60">
+          <i data-lucide="palette" class="w-3.5 h-3.5"></i>
+          <span>色・抽出</span>
+        </button>
+        <button data-tab="blur" class="tab-btn py-2.5 flex items-center justify-center gap-1 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          <span>写真ぼかし</span>
+        </button>
+        <button data-tab="size" class="tab-btn py-2.5 flex items-center justify-center gap-1 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+          <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+          <span>比率・角・影</span>
+        </button>
+      </div>
+
+      <!-- コントロール内容 -->
+      <div class="p-3.5 overflow-y-auto space-y-3.5 text-xs flex-1">
+
+        <!-- 共通：フチの太さスライダー（常に表示） -->
+        <div class="bg-gray-800/60 border border-gray-800 rounded-xl p-3">
+          <div class="flex justify-between items-center mb-1.5">
+            <span class="font-semibold text-gray-200 flex items-center gap-1.5">
+              <i data-lucide="maximize-2" class="w-3.5 h-3.5 text-blue-400"></i>
+              フチの太さ（等距離）
             </span>
-            <label class="flex items-center gap-1.5 text-[11px] text-gray-400 cursor-pointer">
+            <span id="borderWidthLabel" class="font-mono text-blue-400 font-bold">8%</span>
+          </div>
+          <input id="borderWidthSlider" type="range" min="0" max="35" step="0.5" value="8" class="w-full h-2 bg-gray-700 rounded-lg cursor-pointer">
+        </div>
+
+        <!-- タブ1：単色＆自動抽出5色 -->
+        <div id="tab-color" class="tab-panel space-y-3.5">
+          <div class="space-y-2">
+            <span class="text-gray-400 font-medium block">定番カラー & 自由選択</span>
+            <div class="flex items-center justify-between bg-gray-950/50 border border-gray-800/80 rounded-xl p-2.5">
+              <button data-color="#FFFFFF" class="preset-color-btn w-7 h-7 rounded-full bg-white border-2 border-blue-500 shadow ring-2 ring-blue-500/40" title="白 (#FFFFFF)"></button>
+              <button data-color="#F8FAFC" class="preset-color-btn w-7 h-7 rounded-full bg-slate-100 border border-gray-600" title="オフホワイト"></button>
+              <button data-color="#E5E5E5" class="preset-color-btn w-7 h-7 rounded-full bg-neutral-200 border border-gray-600" title="ライトグレー"></button>
+              <button data-color="#18181B" class="preset-color-btn w-7 h-7 rounded-full bg-zinc-900 border border-gray-600" title="ダークグレー"></button>
+              <button data-color="#000000" class="preset-color-btn w-7 h-7 rounded-full bg-black border border-gray-600" title="黒 (#000000)"></button>
+              
+              <!-- カラーピッカー -->
+              <label class="relative flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-tr from-pink-500 via-yellow-400 to-cyan-400 p-0.5 cursor-pointer shadow">
+                <span class="w-full h-full rounded-full bg-gray-900 flex items-center justify-center">
+                  <i data-lucide="pipette" class="w-3.5 h-3.5 text-white"></i>
+                </span>
+                <input id="customColorPicker" type="color" value="#ffffff" class="sr-only">
+              </label>
+            </div>
+          </div>
+
+          <!-- 写真から自動抽出した5色 -->
+          <div class="bg-gray-950/60 border border-gray-800/80 rounded-xl p-3 space-y-2.5">
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-gray-300 font-medium flex items-center gap-1.5">
+                <i data-lucide="wand-2" class="w-3.5 h-3.5 text-amber-400"></i>
+                写真から抽出した5色
+              </span>
+            </div>
+            
+            <div id="extractedPaletteContainer" class="grid grid-cols-5 gap-1.5 pt-0.5">
+              <p class="col-span-5 text-gray-500 text-[11px] py-1">写真を読み込むと自動で5色を抽出します</p>
+            </div>
+
+            <label class="flex items-center gap-2 text-[11px] text-gray-400 cursor-pointer pt-1 border-t border-gray-800/80">
               <input id="autoPerPhotoToggle" type="checkbox" checked class="rounded bg-gray-800 border-gray-700 text-blue-500 focus:ring-0">
-              <span>一括保存時も各写真の色を使う</span>
+              <span>一括保存時も各写真ごとの抽出色を使う</span>
             </label>
           </div>
-          
-          <div id="extractedPaletteContainer" class="flex items-center justify-between gap-2 pt-1">
-            <p class="text-gray-500 text-[11px] py-1">写真を読み込むと自動で5色を抽出します</p>
+        </div>
+
+        <!-- タブ2：写真をぼかしたフチ -->
+        <div id="tab-blur" class="tab-panel hidden space-y-3">
+          <div class="flex items-center justify-between bg-blue-950/40 border border-blue-800/50 rounded-xl px-3 py-2.5">
+            <div>
+              <p class="font-semibold text-blue-200">背景ぼかしフチモード</p>
+              <p class="text-[11px] text-blue-300/80">写真自身を拡大してぼかした背景をフチにします</p>
+            </div>
+            <span class="bg-blue-600 text-white font-semibold px-2.5 py-1 rounded-lg text-[11px] shrink-0">
+              適用中
+            </span>
+          </div>
+
+          <div class="space-y-2.5">
+            <div class="bg-gray-800/50 p-3 rounded-xl border border-gray-800">
+              <div class="flex justify-between mb-1.5">
+                <span class="text-gray-300">ぼかしの強さ</span>
+                <span id="blurAmountLabel" class="font-mono text-blue-400">35px</span>
+              </div>
+              <input id="blurAmountSlider" type="range" min="5" max="100" value="35" class="w-full h-1.5 bg-gray-700 rounded-lg">
+            </div>
+
+            <div class="bg-gray-800/50 p-3 rounded-xl border border-gray-800">
+              <div class="flex justify-between mb-1.5">
+                <span class="text-gray-300">フチの明るさ</span>
+                <span id="blurBrightLabel" class="font-mono text-blue-400">100%</span>
+              </div>
+              <input id="blurBrightSlider" type="range" min="40" max="160" value="100" class="w-full h-1.5 bg-gray-700 rounded-lg">
+            </div>
           </div>
         </div>
+
+        <!-- タブ3：比率計算・角丸・ドロップシャドウ -->
+        <div id="tab-size" class="tab-panel hidden space-y-3">
+          <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800 space-y-1.5">
+            <span class="text-gray-300 font-medium block">比率と距離のルール</span>
+            <div class="grid grid-cols-1 gap-2 pt-0.5">
+              <button data-sizing="equal-margin" class="sizing-btn py-2 px-3 rounded-lg border border-blue-500 bg-blue-950/50 text-blue-300 font-medium text-left">
+                <div class="font-bold text-xs">上下左右が完全等幅</div>
+                <div class="text-[10px] text-gray-400 mt-0.5">4辺すべて全く同じピクセル距離でフチを追加</div>
+              </button>
+              <button data-sizing="exact-aspect" class="sizing-btn py-2 px-3 rounded-lg border border-gray-700 bg-gray-900/50 text-gray-400 font-medium text-left">
+                <div class="font-bold text-xs">外枠も同アスペクト比</div>
+                <div class="text-[10px] text-gray-400 mt-0.5">完成画像の縦横比も元写真と100%同一に保つ</div>
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-2.5">
+            <div class="bg-gray-800/50 p-3 rounded-xl border border-gray-800">
+              <div class="flex justify-between mb-1.5">
+                <span class="text-gray-300">写真の角丸</span>
+                <span id="radiusLabel" class="font-mono text-blue-400">0%</span>
+              </div>
+              <input id="radiusSlider" type="range" min="0" max="20" step="0.5" value="0" class="w-full h-1.5 bg-gray-700 rounded-lg">
+            </div>
+
+            <div class="bg-gray-800/50 p-3 rounded-xl border border-gray-800">
+              <div class="flex justify-between mb-1.5">
+                <span class="text-gray-300">写真の影 (立体感)</span>
+                <span id="shadowLabel" class="font-mono text-blue-400">0%</span>
+              </div>
+              <input id="shadowSlider" type="range" min="0" max="100" step="5" value="0" class="w-full h-1.5 bg-gray-700 rounded-lg">
+            </div>
+          </div>
+        </div>
+
       </div>
+    </section>
 
-      <!-- タブ2：写真をぼかしたフチ -->
-      <div id="tab-blur" class="tab-panel hidden space-y-3">
-        <div class="flex items-center justify-between bg-blue-950/40 border border-blue-800/50 rounded-xl px-3 py-2.5">
-          <div>
-            <p class="font-semibold text-blue-200">背景ぼかしフチモード</p>
-            <p class="text-[11px] text-blue-300/80">写真自身を拡大してぼかした背景をフチにします</p>
-          </div>
-          <button id="enableBlurModeBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition">
-            適用中
-          </button>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800">
-            <div class="flex justify-between mb-1">
-              <span class="text-gray-300">ぼかしの強さ</span>
-              <span id="blurAmountLabel" class="font-mono text-blue-400">35px</span>
-            </div>
-            <input id="blurAmountSlider" type="range" min="5" max="100" value="35" class="w-full h-1.5 bg-gray-700 rounded-lg">
-          </div>
-
-          <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800">
-            <div class="flex justify-between mb-1">
-              <span class="text-gray-300">フチの明るさ</span>
-              <span id="blurBrightLabel" class="font-mono text-blue-400">100%</span>
-            </div>
-            <input id="blurBrightSlider" type="range" min="40" max="160" value="100" class="w-full h-1.5 bg-gray-700 rounded-lg">
-          </div>
-        </div>
-      </div>
-
-      <!-- タブ3：比率計算・角丸・ドロップシャドウ -->
-      <div id="tab-size" class="tab-panel hidden space-y-3">
-        <!-- 計算方式の選択 -->
-        <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800 space-y-1.5">
-          <span class="text-gray-300 font-medium block">比率と距離のルール</span>
-          <div class="grid grid-cols-2 gap-2 pt-0.5">
-            <button data-sizing="equal-margin" class="sizing-btn py-2 px-2.5 rounded-lg border border-blue-500 bg-blue-950/50 text-blue-300 font-medium text-left">
-              <div class="font-bold text-xs">上下左右が完全等幅</div>
-              <div class="text-[10px] text-gray-400 mt-0.5">4辺すべて全く同じピクセル距離でフチを追加</div>
-            </button>
-            <button data-sizing="exact-aspect" class="sizing-btn py-2 px-2.5 rounded-lg border border-gray-700 bg-gray-900/50 text-gray-400 font-medium text-left">
-              <div class="font-bold text-xs">外枠も同アスペクト比</div>
-              <div class="text-[10px] text-gray-400 mt-0.5">完成画像の縦横比も元写真と100%同一に保つ</div>
-            </button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800">
-            <div class="flex justify-between mb-1">
-              <span class="text-gray-300">写真の角丸</span>
-              <span id="radiusLabel" class="font-mono text-blue-400">0%</span>
-            </div>
-            <input id="radiusSlider" type="range" min="0" max="20" step="0.5" value="0" class="w-full h-1.5 bg-gray-700 rounded-lg">
-          </div>
-
-          <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800">
-            <div class="flex justify-between mb-1">
-              <span class="text-gray-300">写真の影 (立体感)</span>
-              <span id="shadowLabel" class="font-mono text-blue-400">0%</span>
-            </div>
-            <input id="shadowSlider" type="range" min="0" max="100" step="5" value="0" class="w-full h-1.5 bg-gray-700 rounded-lg">
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </section>
+  </div>
 
   <!-- 一括保存モーダル -->
   <div id="exportModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -283,19 +312,16 @@
       <div id="exportActionsArea" class="space-y-2.5">
         <p class="text-xs text-gray-400">元の高解像度を維持したまま書き出します（<span id="modalPhotoCount">1</span>枚）</p>
         
-        <!-- スマホ向け：OS共有シートでカメラロールへ一括保存 -->
         <button id="shareAllBtn" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition text-sm">
           <i data-lucide="share" class="w-4 h-4"></i>
           <span>スマホの写真フォルダに保存 / 共有</span>
         </button>
 
-        <!-- 個別ファイルとして連続ダウンロード -->
         <button id="downloadIndividualBtn" class="w-full bg-gray-800 hover:bg-gray-700 active:scale-[0.99] text-gray-100 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border border-gray-700 transition text-xs">
           <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
           <span>1枚ずつそのままダウンロード</span>
         </button>
 
-        <!-- ZIPで一括ダウンロード -->
         <button id="downloadZipBtn" class="w-full bg-gray-800 hover:bg-gray-700 active:scale-[0.99] text-gray-100 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border border-gray-700 transition text-xs">
           <i data-lucide="folder-archive" class="w-4 h-4 text-amber-400"></i>
           <span>ZIPファイルにまとめて一括保存</span>
@@ -305,28 +331,26 @@
   </div>
 
   <script>
-    // アイコン初期化
     lucide.createIcons();
 
-    // アプリの状態管理
     const state = {
-      photos: [], // { id, file, name, img, width, height, palette: ['#...', ...] }
+      photos: [],
       currentIndex: 0,
-      mode: 'solid', // 'solid' | 'extracted' | 'blur'
+      mode: 'solid',
       solidColor: '#FFFFFF',
-      extractedIndex: 0, // 0〜4
+      extractedIndex: 0,
       autoPerPhotoPalette: true,
-      borderPercent: 8, // 短辺に対する割合(%)
-      sizingRule: 'equal-margin', // 'equal-margin' (4辺等幅) | 'exact-aspect' (外枠同アスペクト比)
+      borderPercent: 8,
+      sizingRule: 'equal-margin',
       blurAmount: 35,
       blurBrightness: 100,
       cornerRadius: 0,
       shadowStrength: 0
     };
 
-    // DOM要素
     const fileInput = document.getElementById('fileInput');
     const emptyState = document.getElementById('emptyState');
+    const previewContainer = document.getElementById('previewContainer');
     const previewCanvas = document.getElementById('previewCanvas');
     const thumbnailBar = document.getElementById('thumbnailBar');
     const thumbnailList = document.getElementById('thumbnailList');
@@ -338,9 +362,6 @@
     const clearAllBtn = document.getElementById('clearAllBtn');
     const extractedPaletteContainer = document.getElementById('extractedPaletteContainer');
 
-    // ==========================================
-    // 1. 写真の読み込み & 5色自動抽出 (K-means法)
-    // ==========================================
     fileInput.addEventListener('change', async (e) => {
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
@@ -389,7 +410,6 @@
       });
     }
 
-    // 写真から代表的な5色を自動抽出するアルゴリズム（高速K-meansクラスタリング）
     function extractFiveColors(img) {
       const sampleSize = 64;
       const canvas = document.createElement('canvas');
@@ -408,7 +428,6 @@
         return ['#FFFFFF', '#E2E8F0', '#94A3B8', '#475569', '#1E293B'];
       }
 
-      // K-means++ 風の初期中心点選択（色差が離れた5色を選ぶ）
       const k = 5;
       const centroids = [pixels[Math.floor(pixels.length / 2)]];
       while (centroids.length < k) {
@@ -428,7 +447,6 @@
         centroids.push([...farthestPixel]);
       }
 
-      // 8回反復してクラスタ中心を収束させる
       let clusters = Array.from({ length: k }, () => []);
       for (let iter = 0; iter < 8; iter++) {
         clusters = Array.from({ length: k }, () => []);
@@ -457,28 +475,21 @@
         }
       }
 
-      // 面積（ピクセル数）が多い順にソートしてHEX化
-      const sorted = centroids
+      return centroids
         .map((c, idx) => ({ rgb: c, count: clusters[idx].length }))
         .sort((a, b) => b.count - a.count)
         .map(item => rgbToHex(item.rgb[0], item.rgb[1], item.rgb[2]));
-
-      return sorted;
     }
 
     function rgbToHex(r, g, b) {
       return '#' + [r, g, b].map(x => Math.max(0, Math.min(255, x)).toString(16).padStart(2, '0')).join('').toUpperCase();
     }
 
-    // ==========================================
-    // 2. キャンバス描画ロジック（プレビュー＆本番書き出し共通）
-    // ==========================================
     function renderPhotoWithFrame(targetCanvas, photoObj, maxPreviewDimension = null) {
       const img = photoObj.img;
       const origW = photoObj.width;
       const origH = photoObj.height;
 
-      // プレビュー時は負荷軽減のため縮小計算、保存時は元解像度100%
       let scale = 1;
       if (maxPreviewDimension) {
         const maxSide = Math.max(origW, origH);
@@ -495,12 +506,10 @@
       let padX, padY;
 
       if (state.sizingRule === 'equal-margin') {
-        // 4辺すべて完全に等しい距離のフチをつける（内側の写真比率は100%維持）
         const equalPad = Math.round(minSide * ratio);
         padX = equalPad;
         padY = equalPad;
       } else {
-        // 外枠のアスペクト比も元写真と100%同一にする
         padX = Math.round(innerW * ratio);
         padY = Math.round(innerH * ratio);
       }
@@ -513,13 +522,9 @@
       const ctx = targetCanvas.getContext('2d');
       ctx.save();
 
-      // 1. 背景（フチ部分）の描画
       if (state.mode === 'blur') {
-        // 写真をぼかした背景を描画
         const blurPx = Math.max(2, Math.round((state.blurAmount / 1000) * Math.max(totalW, totalH)));
         const expand = blurPx * 3;
-        
-        // 先にベースを黒で塗りつぶして端の透けを防ぐ
         ctx.fillStyle = '#111111';
         ctx.fillRect(0, 0, totalW, totalH);
 
@@ -528,7 +533,6 @@
         ctx.drawImage(img, -expand, -expand, totalW + expand * 2, totalH + expand * 2);
         ctx.restore();
       } else {
-        // 単色または自動抽出カラーで塗りつぶし
         let fillColor = state.solidColor;
         if (state.mode === 'extracted') {
           if (state.autoPerPhotoPalette) {
@@ -542,7 +546,6 @@
         ctx.fillRect(0, 0, totalW, totalH);
       }
 
-      // 2. ドロップシャドウ＆角丸パス作成
       const radiusPx = Math.round((state.cornerRadius / 100) * (minSide / 2));
 
       if (state.shadowStrength > 0 && state.borderPercent > 0) {
@@ -560,7 +563,6 @@
         ctx.restore();
       }
 
-      // 3. 元写真の描画
       ctx.save();
       if (radiusPx > 0) {
         drawRoundedRectPath(ctx, padX, padY, innerW, innerH, radiusPx);
@@ -584,22 +586,40 @@
       ctx.closePath();
     }
 
+    // プレビュー領域の空きサイズに合わせてキャンバスを最大化フィット表示させる
+    function fitCanvasToContainer() {
+      if (!previewCanvas.width || !previewCanvas.height) return;
+      const rect = previewContainer.getBoundingClientRect();
+      const availW = Math.max(50, rect.width - 24);
+      const availH = Math.max(50, rect.height - 24);
+      const imgAspect = previewCanvas.width / previewCanvas.height;
+      const boxAspect = availW / availH;
+
+      if (imgAspect > boxAspect) {
+        previewCanvas.style.width = `${availW}px`;
+        previewCanvas.style.height = `${availW / imgAspect}px`;
+      } else {
+        previewCanvas.style.height = `${availH}px`;
+        previewCanvas.style.width = `${availH * imgAspect}px`;
+      }
+    }
+
+    window.addEventListener('resize', fitCanvasToContainer);
+
     function renderPreview() {
       if (!state.photos.length) return;
       const current = state.photos[state.currentIndex];
-      const info = renderPhotoWithFrame(previewCanvas, current, 1400);
+      const info = renderPhotoWithFrame(previewCanvas, current, 1600);
+      fitCanvasToContainer();
       infoResolution.textContent = `出力: ${info.totalW} × ${info.totalH}px`;
       infoIndex.textContent = `${state.currentIndex + 1} / ${state.photos.length}枚目`;
     }
 
-    // ==========================================
-    // 3. UI操作・イベント連携
-    // ==========================================
     function renderThumbnails() {
       thumbnailList.innerHTML = '';
       state.photos.forEach((photo, idx) => {
         const wrapper = document.createElement('div');
-        wrapper.className = `relative shrink-0 w-14 h-14 rounded-lg overflow-hidden cursor-pointer border-2 transition ${
+        wrapper.className = `relative shrink-0 w-12 h-12 rounded-lg overflow-hidden cursor-pointer border-2 transition ${
           idx === state.currentIndex ? 'border-blue-500 scale-105 shadow-md' : 'border-gray-700 opacity-60 hover:opacity-100'
         }`;
         
@@ -608,7 +628,6 @@
         thumbImg.className = 'w-full h-full object-cover';
         wrapper.appendChild(thumbImg);
 
-        // 個別削除ボタン
         const delBtn = document.createElement('button');
         delBtn.innerHTML = '×';
         delBtn.className = 'absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white text-[10px] leading-none flex items-center justify-center hover:bg-red-600';
@@ -648,14 +667,14 @@
       current.palette.forEach((hex, idx) => {
         const isSelected = state.mode === 'extracted' && state.extractedIndex === idx;
         const btn = document.createElement('button');
-        btn.className = `flex-1 h-9 rounded-lg border flex items-center justify-center transition relative ${
+        btn.className = `h-10 rounded-lg border flex items-center justify-center transition relative ${
           isSelected ? 'border-blue-400 ring-2 ring-blue-500/50 scale-105 z-10' : 'border-gray-700 hover:scale-102'
         }`;
         btn.style.backgroundColor = hex;
         btn.title = `抽出カラー ${idx + 1}: ${hex}`;
 
         const label = document.createElement('span');
-        label.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/45 text-white backdrop-blur-xs';
+        label.className = 'text-[9px] font-mono px-1 py-0.5 rounded bg-black/55 text-white';
         label.textContent = hex;
         btn.appendChild(label);
 
@@ -695,7 +714,6 @@
 
     clearAllBtn.addEventListener('click', resetToEmpty);
 
-    // タブ切り替え
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const target = btn.dataset.tab;
@@ -711,7 +729,6 @@
           panel.classList.toggle('hidden', panel.id !== `tab-${target}`);
         });
 
-        // ぼかしタブを開いたときは自動的にぼかしモードをONにする
         if (target === 'blur') {
           state.mode = 'blur';
           renderPreview();
@@ -719,7 +736,6 @@
       });
     });
 
-    // 定番カラーボタン
     document.querySelectorAll('.preset-color-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         state.mode = 'solid';
@@ -730,7 +746,6 @@
       });
     });
 
-    // カスタムカラーピッカー
     document.getElementById('customColorPicker').addEventListener('input', (e) => {
       state.mode = 'solid';
       state.solidColor = e.target.value;
@@ -739,13 +754,11 @@
       renderPreview();
     });
 
-    // 一括保存時の各写真抽出色トグル
     document.getElementById('autoPerPhotoToggle').addEventListener('change', (e) => {
       state.autoPerPhotoPalette = e.target.checked;
       renderPreview();
     });
 
-    // スライダー各種
     document.getElementById('borderWidthSlider').addEventListener('input', (e) => {
       state.borderPercent = parseFloat(e.target.value);
       document.getElementById('borderWidthLabel').textContent = `${state.borderPercent}%`;
@@ -778,7 +791,6 @@
       renderPreview();
     });
 
-    // 比率計算ルール切り替え
     document.querySelectorAll('.sizing-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         state.sizingRule = btn.dataset.sizing;
@@ -795,9 +807,6 @@
       });
     });
 
-    // ==========================================
-    // 4. 一括書き出し・保存機能（共有シート / 個別 / ZIP）
-    // ==========================================
     const exportModal = document.getElementById('exportModal');
     const exportProgressArea = document.getElementById('exportProgressArea');
     const exportActionsArea = document.getElementById('exportActionsArea');
@@ -816,7 +825,6 @@
       exportModal.classList.add('hidden');
     });
 
-    // 全写真をフル解像度でBlob化する共通関数
     async function generateAllBlobs() {
       exportActionsArea.classList.add('hidden');
       exportProgressArea.classList.remove('hidden');
@@ -829,10 +837,9 @@
         exportProgressCount.textContent = `${i + 1} / ${state.photos.length}`;
         exportProgressBar.style.width = `${Math.round(((i + 1) / state.photos.length) * 100)}%`;
 
-        // UI描画更新のために1フレーム待機
         await new Promise(r => setTimeout(r, 30));
 
-        renderPhotoWithFrame(workCanvas, photo, null); // フル解像度
+        renderPhotoWithFrame(workCanvas, photo, null);
         const blob = await new Promise(resolve => workCanvas.toBlob(resolve, 'image/jpeg', 0.95));
         const filename = `${photo.name}_framed.jpg`;
         results.push({ blob, filename });
@@ -840,17 +847,13 @@
       return results;
     }
 
-    // 方法1：スマホの共有シート（Web Share API）で写真アプリへ一括保存
     document.getElementById('shareAllBtn').addEventListener('click', async () => {
       const items = await generateAllBlobs();
       const files = items.map(item => new File([item.blob], item.filename, { type: 'image/jpeg' }));
 
       if (navigator.canShare && navigator.canShare({ files })) {
         try {
-          await navigator.share({
-            files,
-            title: 'フチ付き写真'
-          });
+          await navigator.share({ files, title: 'フチ付き写真' });
           exportModal.classList.add('hidden');
           return;
         } catch (err) {
@@ -860,12 +863,10 @@
           }
         }
       }
-      // Web Share非対応ブラウザの場合はそのまま個別ダウンロードへフォールバック
       triggerIndividualDownloads(items);
       exportModal.classList.add('hidden');
     });
 
-    // 方法2：1枚ずつそのままダウンロード
     document.getElementById('downloadIndividualBtn').addEventListener('click', async () => {
       const items = await generateAllBlobs();
       triggerIndividualDownloads(items);
@@ -887,7 +888,6 @@
       });
     }
 
-    // 方法3：ZIPで一括ダウンロード
     document.getElementById('downloadZipBtn').addEventListener('click', async () => {
       const items = await generateAllBlobs();
       const zip = new JSZip();
