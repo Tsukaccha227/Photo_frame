@@ -10,7 +10,6 @@
   <meta name="theme-color" content="#111827">
   <title>PhotoFrame Studio - 一括写真フチ付けアプリ</title>
   
-  <!-- 外部 manifest.json を直接指定（書き換えなし） -->
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
@@ -53,6 +52,9 @@
 </head>
 <body class="bg-gray-950 text-gray-100 h-dvh flex flex-col overflow-hidden">
 
+  <!-- ファイル入力本体 -->
+  <input id="fileInput" type="file" accept="image/*" multiple class="hidden">
+
   <header class="bg-gray-900/95 backdrop-blur border-b border-gray-800 px-4 py-2 flex items-center justify-between shrink-0 z-20">
     <div class="flex items-center gap-2">
       <div class="w-6 h-6 rounded-md bg-white p-1 flex items-center justify-center shadow">
@@ -63,24 +65,18 @@
 
     <div class="flex items-center gap-2">
       <!-- アイコン画像がリポジトリに無い時だけ表示されるアイコン生成ボタン -->
-      <button id="downloadIconsBtn" class="hidden bg-amber-600 hover:bg-amber-500 active:scale-95 transition text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow">
+      <button id="downloadIconsBtn" type="button" class="hidden bg-amber-600 hover:bg-amber-500 active:scale-95 transition text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow">
         <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
         <span>PWA用アイコンDL</span>
       </button>
 
       <!-- PWAインストールボタン（対応環境で自動表示） -->
-      <button id="installAppBtn" class="hidden bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow">
+      <button id="installAppBtn" type="button" class="hidden bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow">
         <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
         <span>インストール</span>
       </button>
 
-      <label for="fileInput" class="cursor-pointer bg-gray-800 hover:bg-gray-700 active:scale-95 transition text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-gray-700">
-        <i data-lucide="image-plus" class="w-4 h-4 text-blue-400"></i>
-        <span>写真を追加</span>
-      </label>
-      <input id="fileInput" type="file" accept="image/*" multiple class="hidden">
-
-      <button id="exportBtn" disabled class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-500 active:scale-95 transition text-xs font-semibold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-lg shadow-blue-900/20">
+      <button id="exportBtn" type="button" disabled class="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-500 active:scale-95 transition text-xs font-semibold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-lg shadow-blue-900/20">
         <i data-lucide="download" class="w-4 h-4"></i>
         <span id="exportBtnText">一括保存</span>
       </button>
@@ -91,15 +87,16 @@
 
     <main class="flex-1 flex flex-col min-h-0 min-w-0 relative bg-checkerboard">
       
-      <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center p-6 z-10 bg-gray-950/90 backdrop-blur-sm">
-        <label for="fileInput" class="w-full max-w-md border-2 border-dashed border-gray-700 hover:border-blue-500 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition bg-gray-900/60 hover:bg-gray-900">
+      <!-- 初期画面：左側の画像選択エリア（button化して確実に反応するように修正） -->
+      <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center p-6 z-20 bg-gray-950/90 backdrop-blur-sm">
+        <button id="mainSelectPhotoBtn" type="button" class="w-full max-w-md border-2 border-dashed border-gray-700 hover:border-blue-500 active:scale-[0.99] rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition bg-gray-900/60 hover:bg-gray-900">
           <div class="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-3 text-blue-400">
             <i data-lucide="images" class="w-7 h-7"></i>
           </div>
           <p class="text-base font-bold text-white mb-1">写真をタップして選択（複数可）</p>
           <p class="text-xs text-gray-400 mb-4">元の比率を保ったまま、等しい距離で綺麗なフチをつけます</p>
           <span class="bg-blue-600 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow">カメラロール・フォルダから選ぶ</span>
-        </label>
+        </button>
       </div>
 
       <div id="previewContainer" class="flex-1 flex items-center justify-center p-4 sm:p-6 min-h-0 min-w-0 relative overflow-hidden">
@@ -111,10 +108,16 @@
           <span id="infoIndex">1 / 1</span>
         </div>
 
-        <button id="clearAllBtn" class="hidden absolute top-2.5 right-2.5 bg-gray-900/80 hover:bg-red-950/90 text-gray-400 hover:text-red-300 backdrop-blur border border-gray-700/80 text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1 transition">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          <span>すべてクリア</span>
-        </button>
+        <div id="topRightOverlayBtns" class="hidden absolute top-2.5 right-2.5 flex items-center gap-1.5">
+          <button id="addMorePhotoBtn" type="button" class="bg-gray-900/80 hover:bg-gray-800 text-blue-400 backdrop-blur border border-gray-700/80 text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1 transition">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>追加</span>
+          </button>
+          <button id="clearAllBtn" type="button" class="bg-gray-900/80 hover:bg-red-950/90 text-gray-400 hover:text-red-300 backdrop-blur border border-gray-700/80 text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1 transition">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>すべてクリア</span>
+          </button>
+        </div>
       </div>
 
       <div id="thumbnailBar" class="hidden bg-gray-900/95 border-t border-gray-800 px-3 py-1.5 shrink-0">
@@ -124,15 +127,15 @@
 
     <section class="control-sidebar bg-gray-900 shrink-0 z-20 flex flex-col">
       <div class="grid grid-cols-3 border-b border-gray-800 text-xs font-semibold bg-gray-950/50 shrink-0">
-        <button data-tab="color" class="tab-btn py-2.5 flex items-center justify-center gap-1 border-b-2 border-blue-500 text-blue-400 bg-gray-900/60">
+        <button data-tab="color" type="button" class="tab-btn py-2.5 flex items-center justify-center gap-1 border-b-2 border-blue-500 text-blue-400 bg-gray-900/60">
           <i data-lucide="palette" class="w-3.5 h-3.5"></i>
           <span>色・抽出</span>
         </button>
-        <button data-tab="blur" class="tab-btn py-2.5 flex items-center justify-center gap-1 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+        <button data-tab="blur" type="button" class="tab-btn py-2.5 flex items-center justify-center gap-1 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
           <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
           <span>写真ぼかし</span>
         </button>
-        <button data-tab="size" class="tab-btn py-2.5 flex items-center justify-center gap-1 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
+        <button data-tab="size" type="button" class="tab-btn py-2.5 flex items-center justify-center gap-1 border-b-2 border-transparent text-gray-400 hover:text-gray-200">
           <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
           <span>比率・角・影</span>
         </button>
@@ -154,11 +157,11 @@
           <div class="space-y-2">
             <span class="text-gray-400 font-medium block">定番カラー & 自由選択</span>
             <div class="flex items-center justify-between bg-gray-950/50 border border-gray-800/80 rounded-xl p-2.5">
-              <button data-color="#FFFFFF" class="preset-color-btn w-7 h-7 rounded-full bg-white border-2 border-blue-500 shadow ring-2 ring-blue-500/40" title="白 (#FFFFFF)"></button>
-              <button data-color="#F8FAFC" class="preset-color-btn w-7 h-7 rounded-full bg-slate-100 border border-gray-600" title="オフホワイト"></button>
-              <button data-color="#E5E5E5" class="preset-color-btn w-7 h-7 rounded-full bg-neutral-200 border border-gray-600" title="ライトグレー"></button>
-              <button data-color="#18181B" class="preset-color-btn w-7 h-7 rounded-full bg-zinc-900 border border-gray-600" title="ダークグレー"></button>
-              <button data-color="#000000" class="preset-color-btn w-7 h-7 rounded-full bg-black border border-gray-600" title="黒 (#000000)"></button>
+              <button data-color="#FFFFFF" type="button" class="preset-color-btn w-7 h-7 rounded-full bg-white border-2 border-blue-500 shadow ring-2 ring-blue-500/40" title="白 (#FFFFFF)"></button>
+              <button data-color="#F8FAFC" type="button" class="preset-color-btn w-7 h-7 rounded-full bg-slate-100 border border-gray-600" title="オフホワイト"></button>
+              <button data-color="#E5E5E5" type="button" class="preset-color-btn w-7 h-7 rounded-full bg-neutral-200 border border-gray-600" title="ライトグレー"></button>
+              <button data-color="#18181B" type="button" class="preset-color-btn w-7 h-7 rounded-full bg-zinc-900 border border-gray-600" title="ダークグレー"></button>
+              <button data-color="#000000" type="button" class="preset-color-btn w-7 h-7 rounded-full bg-black border border-gray-600" title="黒 (#000000)"></button>
               
               <label class="relative flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-tr from-pink-500 via-yellow-400 to-cyan-400 p-0.5 cursor-pointer shadow">
                 <span class="w-full h-full rounded-full bg-gray-900 flex items-center justify-center">
@@ -220,11 +223,11 @@
           <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800 space-y-1.5">
             <span class="text-gray-300 font-medium block">比率と距離のルール</span>
             <div class="grid grid-cols-1 gap-2 pt-0.5">
-              <button data-sizing="equal-margin" class="sizing-btn py-2 px-3 rounded-lg border border-blue-500 bg-blue-950/50 text-blue-300 font-medium text-left">
+              <button data-sizing="equal-margin" type="button" class="sizing-btn py-2 px-3 rounded-lg border border-blue-500 bg-blue-950/50 text-blue-300 font-medium text-left">
                 <div class="font-bold text-xs">上下左右が完全等幅</div>
                 <div class="text-[10px] text-gray-400 mt-0.5">4辺すべて全く同じピクセル距離でフチを追加</div>
               </button>
-              <button data-sizing="exact-aspect" class="sizing-btn py-2 px-3 rounded-lg border border-gray-700 bg-gray-900/50 text-gray-400 font-medium text-left">
+              <button data-sizing="exact-aspect" type="button" class="sizing-btn py-2 px-3 rounded-lg border border-gray-700 bg-gray-900/50 text-gray-400 font-medium text-left">
                 <div class="font-bold text-xs">外枠も同アスペクト比</div>
                 <div class="text-[10px] text-gray-400 mt-0.5">完成画像の縦横比も元写真と100%同一に保つ</div>
               </button>
@@ -262,7 +265,7 @@
           <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400"></i>
           <span>画像の書き出し・保存</span>
         </h3>
-        <button id="closeModalBtn" class="text-gray-400 hover:text-white p-1">
+        <button id="closeModalBtn" type="button" class="text-gray-400 hover:text-white p-1">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -280,17 +283,17 @@
       <div id="exportActionsArea" class="space-y-2.5">
         <p class="text-xs text-gray-400">元の高解像度を維持したまま書き出します（<span id="modalPhotoCount">1</span>枚）</p>
         
-        <button id="shareAllBtn" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition text-sm">
+        <button id="shareAllBtn" type="button" class="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition text-sm">
           <i data-lucide="share" class="w-4 h-4"></i>
           <span>スマホの写真フォルダに保存 / 共有</span>
         </button>
 
-        <button id="downloadIndividualBtn" class="w-full bg-gray-800 hover:bg-gray-700 active:scale-[0.99] text-gray-100 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border border-gray-700 transition text-xs">
+        <button id="downloadIndividualBtn" type="button" class="w-full bg-gray-800 hover:bg-gray-700 active:scale-[0.99] text-gray-100 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border border-gray-700 transition text-xs">
           <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
           <span>1枚ずつそのままダウンロード</span>
         </button>
 
-        <button id="downloadZipBtn" class="w-full bg-gray-800 hover:bg-gray-700 active:scale-[0.99] text-gray-100 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border border-gray-700 transition text-xs">
+        <button id="downloadZipBtn" type="button" class="w-full bg-gray-800 hover:bg-gray-700 active:scale-[0.99] text-gray-100 font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border border-gray-700 transition text-xs">
           <i data-lucide="folder-archive" class="w-4 h-4 text-amber-400"></i>
           <span>ZIPファイルにまとめて一括保存</span>
         </button>
@@ -301,7 +304,6 @@
   <script>
     lucide.createIcons();
 
-    // --- PWA セットアップ（純粋なService Worker登録 + アイコンDL支援） ---
     (function setupPWA() {
       function createAppIconBlob(size) {
         const c = document.createElement('canvas');
@@ -339,7 +341,6 @@
         return new Promise(r => c.toBlob(r, 'image/png'));
       }
 
-      // icon-192.png がまだリポジトリに無い場合のみ「PWA用アイコンDL」ボタンを表示
       const dlIconsBtn = document.getElementById('downloadIconsBtn');
       fetch('./icon-192.png', { method: 'HEAD' }).then(res => {
         if (!res.ok) dlIconsBtn.classList.remove('hidden');
@@ -395,6 +396,8 @@
     };
 
     const fileInput = document.getElementById('fileInput');
+    const mainSelectPhotoBtn = document.getElementById('mainSelectPhotoBtn');
+    const addMorePhotoBtn = document.getElementById('addMorePhotoBtn');
     const emptyState = document.getElementById('emptyState');
     const previewContainer = document.getElementById('previewContainer');
     const previewCanvas = document.getElementById('previewCanvas');
@@ -405,8 +408,21 @@
     const imageInfoBadge = document.getElementById('imageInfoBadge');
     const infoResolution = document.getElementById('infoResolution');
     const infoIndex = document.getElementById('infoIndex');
+    const topRightOverlayBtns = document.getElementById('topRightOverlayBtns');
     const clearAllBtn = document.getElementById('clearAllBtn');
     const extractedPaletteContainer = document.getElementById('extractedPaletteContainer');
+
+    // 左側の大きな選択ボタンで確実にファイル選択を開く
+    mainSelectPhotoBtn.addEventListener('click', () => {
+      fileInput.value = '';
+      fileInput.click();
+    });
+
+    // プレビュー画面右上の「＋追加」ボタン
+    addMorePhotoBtn.addEventListener('click', () => {
+      fileInput.value = '';
+      fileInput.click();
+    });
 
     fileInput.addEventListener('change', async (e) => {
       const files = Array.from(e.target.files || []);
@@ -418,7 +434,7 @@
           const img = await loadImage(file);
           const palette = extractFiveColors(img);
           state.photos.push({
-            id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+            id: String(Date.now() + Math.random()),
             file,
             name: file.name.replace(/\.[^/.]+$/, ''),
             img,
@@ -431,12 +447,11 @@
         }
       }
 
-      fileInput.value = '';
       if (state.photos.length > 0) {
         emptyState.classList.add('hidden');
         thumbnailBar.classList.remove('hidden');
         imageInfoBadge.classList.remove('hidden');
-        clearAllBtn.classList.remove('hidden');
+        topRightOverlayBtns.classList.remove('hidden');
         exportBtn.disabled = false;
         exportBtnText.textContent = state.photos.length > 1 ? `一括保存 (${state.photos.length}枚)` : '保存する';
         
@@ -663,6 +678,7 @@
         wrapper.appendChild(thumbImg);
 
         const delBtn = document.createElement('button');
+        delBtn.type = 'button';
         delBtn.innerHTML = '×';
         delBtn.className = 'absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white text-[10px] leading-none flex items-center justify-center hover:bg-red-600';
         delBtn.onclick = (e) => {
@@ -701,6 +717,7 @@
       current.palette.forEach((hex, idx) => {
         const isSelected = state.mode === 'extracted' && state.extractedIndex === idx;
         const btn = document.createElement('button');
+        btn.type = 'button';
         btn.className = `h-10 rounded-lg border flex items-center justify-center transition relative ${
           isSelected ? 'border-blue-400 ring-2 ring-blue-500/50 scale-105 z-10' : 'border-gray-700 hover:scale-102'
         }`;
@@ -739,7 +756,7 @@
       emptyState.classList.remove('hidden');
       thumbnailBar.classList.add('hidden');
       imageInfoBadge.classList.add('hidden');
-      clearAllBtn.classList.add('hidden');
+      topRightOverlayBtns.classList.add('hidden');
       exportBtn.disabled = true;
       exportBtnText.textContent = '一括保存';
       const ctx = previewCanvas.getContext('2d');
