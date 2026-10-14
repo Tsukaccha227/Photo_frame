@@ -10,7 +10,9 @@
   <meta name="theme-color" content="#111827">
   <title>PhotoFrame Studio - 一括写真フチ付けアプリ</title>
   
-  <link rel="manifest" href='data:application/manifest+json,{"name":"PhotoFrame Studio","short_name":"フチ付け","display":"standalone","background_color":"#111827","theme_color":"#111827","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect width=%27100%27 height=%27100%27 rx=%2722%27 fill=%27%23ffffff%27/%3E%3Crect x=%2716%27 y=%2716%27 width=%2768%27 height=%2768%27 rx=%2710%27 fill=%27%231f2937%27/%3E%3Ccircle cx=%2738%27 cy=%2738%27 r=%278%27 fill=%27%2360a5fa%27/%3E%3Cpath d=%27M22 72 L45 48 L62 64 L72 54 L80 72 Z%27 fill=%27%2334d399%27/%3E%3C/svg%3E","sizes":"192x192","type":"image/svg+xml"}]}'>
+  <!-- マニフェスト参照（動的生成または外部manifest.json） -->
+  <link id="manifestLink" rel="manifest" href="./manifest.json">
+  <link id="appleTouchIcon" rel="apple-touch-icon" href="">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -59,6 +61,12 @@
     </div>
 
     <div class="flex items-center gap-2">
+      <!-- PWAインストールボタン（対応環境で自動表示） -->
+      <button id="installAppBtn" class="hidden bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow">
+        <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+        <span>インストール</span>
+      </button>
+
       <label for="fileInput" class="cursor-pointer bg-gray-800 hover:bg-gray-700 active:scale-95 transition text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-gray-700">
         <i data-lucide="image-plus" class="w-4 h-4 text-blue-400"></i>
         <span>写真を追加</span>
@@ -285,6 +293,98 @@
 
   <script>
     lucide.createIcons();
+
+    // --- PWA セットアップ（192x192 / 512x512 PNGアイコン生成 & マニフェスト・SW登録） ---
+    (function setupPWA() {
+      function createAppIconPNG(size) {
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext('2d');
+
+        // 背景（白角丸）
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, size, size, size * 0.22);
+        ctx.fill();
+
+        // 内側フレーム（ダークグレー）
+        const pad = size * 0.16;
+        const inner = size - pad * 2;
+        ctx.fillStyle = '#1f2937';
+        ctx.beginPath();
+        ctx.roundRect(pad, pad, inner, inner, size * 0.1);
+        ctx.fill();
+
+        // 太陽マーク
+        ctx.fillStyle = '#60a5fa';
+        ctx.beginPath();
+        ctx.arc(size * 0.38, size * 0.38, size * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 山マーク
+        ctx.fillStyle = '#34d399';
+        ctx.beginPath();
+        ctx.moveTo(size * 0.22, size * 0.72);
+        ctx.lineTo(size * 0.45, size * 0.48);
+        ctx.lineTo(size * 0.62, size * 0.64);
+        ctx.lineTo(size * 0.72, size * 0.54);
+        ctx.lineTo(size * 0.80, size * 0.72);
+        ctx.closePath();
+        ctx.fill();
+
+        return c.toDataURL('image/png');
+      }
+
+      const icon192 = createAppIconPNG(192);
+      const icon512 = createAppIconPNG(512);
+      document.getElementById('appleTouchIcon').href = icon192;
+
+      // 外部 manifest.json が存在しない場合のフォールバックとして動的マニフェストを設定
+      fetch('./manifest.json', { method: 'HEAD' }).then(res => {
+        if (!res.ok) throw new Error('No external manifest');
+      }).catch(() => {
+        const dynamicManifest = {
+          id: location.pathname,
+          name: 'PhotoFrame Studio - 一括写真フチ付けアプリ',
+          short_name: 'フチ付け',
+          description: '元の比率を保ったまま、等しい距離で綺麗なフチをつけるアプリ',
+          start_url: location.href.split('#')[0],
+          scope: location.href.substring(0, location.href.lastIndexOf('/') + 1),
+          display: 'standalone',
+          background_color: '#111827',
+          theme_color: '#111827',
+          icons: [
+            { src: icon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+          ]
+        };
+        const blob = new Blob([JSON.stringify(dynamicManifest)], { type: 'application/manifest+json' });
+        document.getElementById('manifestLink').href = URL.createObjectURL(blob);
+      });
+
+      // Service Worker 登録
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      }
+
+      // インストールプロンプト制御
+      let deferredPrompt = null;
+      const installBtn = document.getElementById('installAppBtn');
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBtn.classList.remove('hidden');
+      });
+
+      installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        installBtn.classList.add('hidden');
+      });
+    })();
 
     const state = {
       photos: [],
@@ -539,12 +639,10 @@
       ctx.closePath();
     }
 
-    // プレビュー表示時に画面領域いっぱいにキャンバスが大きく表示されるように自動調整
     function renderPreview() {
       if (!state.photos.length) return;
       const current = state.photos[state.currentIndex];
       
-      // プレビュー用に解像度を適切に抑えることで綺麗に大きく表示させる
       const containerW = previewContainer.clientWidth - 32;
       const containerH = previewContainer.clientHeight - 32;
       const maxDim = Math.max(containerW, containerH, 1000);
