@@ -10,10 +10,8 @@
   <meta name="theme-color" content="#111827">
   <title>PhotoFrame Studio - 一括写真フチ付けアプリ</title>
   
-  <!-- PWA用 Web App Manifest -->
   <link rel="manifest" href='data:application/manifest+json,{"name":"PhotoFrame Studio","short_name":"フチ付け","display":"standalone","background_color":"#111827","theme_color":"#111827","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Crect width=%27100%27 height=%27100%27 rx=%2722%27 fill=%27%23ffffff%27/%3E%3Crect x=%2716%27 y=%2716%27 width=%2768%27 height=%2768%27 rx=%2710%27 fill=%27%231f2937%27/%3E%3Ccircle cx=%2738%27 cy=%2738%27 r=%278%27 fill=%27%2360a5fa%27/%3E%3Cpath d=%27M22 72 L45 48 L62 64 L72 54 L80 72 Z%27 fill=%27%2334d399%27/%3E%3C/svg%3E","sizes":"192x192","type":"image/svg+xml"}]}'>
 
-  <!-- Tailwind CSS & JSZip & Lucide Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -38,40 +36,20 @@
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     input[type="range"] { accent-color: #3b82f6; }
 
-    /* 縦画面（デフォルト）と 横画面・Foldメイン画面（ワイド時）の自動切り替え */
-    .workspace-layout {
-      display: flex;
-      flex-direction: column;
-    }
-    .control-sidebar {
-      max-height: 45dvh;
-      width: 100%;
-      border-top: 1px solid #1f2937;
-    }
+    .workspace-layout { display: flex; flex-direction: column; }
+    .control-sidebar { max-height: 45dvh; width: 100%; border-top: 1px solid #1f2937; }
 
-    /* 横向き または 折りたたみメイン画面（幅640px以上）では左右分割にする */
     @media (orientation: landscape), (min-width: 640px) {
-      .workspace-layout {
-        flex-direction: row;
-      }
-      .control-sidebar {
-        max-height: none;
-        height: 100%;
-        width: 360px;
-        border-top: none;
-        border-left: 1px solid #1f2937;
-      }
+      .workspace-layout { flex-direction: row; }
+      .control-sidebar { max-height: none; height: 100%; width: 360px; border-top: none; border-left: 1px solid #1f2937; }
     }
     @media (min-width: 960px) {
-      .control-sidebar {
-        width: 400px;
-      }
+      .control-sidebar { width: 400px; }
     }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 h-dvh flex flex-col overflow-hidden">
 
-  <!-- ヘッダー -->
   <header class="bg-gray-900/95 backdrop-blur border-b border-gray-800 px-4 py-2 flex items-center justify-between shrink-0 z-20">
     <div class="flex items-center gap-2">
       <div class="w-6 h-6 rounded-md bg-white p-1 flex items-center justify-center shadow">
@@ -94,13 +72,10 @@
     </div>
   </header>
 
-  <!-- ワークスペース全体（縦画面：上下分割 ／ 横画面・Fold展開時：左画像・右UI） -->
   <div class="workspace-layout flex-1 min-h-0 min-w-0 overflow-hidden">
 
-    <!-- 左側（縦画面では上側）：画像プレビュー＋サムネイル -->
     <main class="flex-1 flex flex-col min-h-0 min-w-0 relative bg-checkerboard">
       
-      <!-- 未選択時の初期画面 -->
       <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center p-6 z-10 bg-gray-950/90 backdrop-blur-sm">
         <label for="fileInput" class="w-full max-w-md border-2 border-dashed border-gray-700 hover:border-blue-500 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition bg-gray-900/60 hover:bg-gray-900">
           <div class="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-3 text-blue-400">
@@ -112,36 +87,27 @@
         </label>
       </div>
 
-      <!-- キャンバスプレビュー領域（画面いっぱいに大きく表示） -->
-      <div id="previewContainer" class="flex-1 flex items-center justify-center p-2 sm:p-4 min-h-0 min-w-0 relative overflow-hidden">
-        <canvas id="previewCanvas" class="max-w-full max-h-full w-auto h-auto object-contain shadow-2xl transition-opacity duration-150"></canvas>
+      <div id="previewContainer" class="flex-1 flex items-center justify-center p-4 sm:p-6 min-h-0 min-w-0 relative overflow-hidden">
+        <canvas id="previewCanvas" class="max-w-full max-h-full object-contain shadow-2xl transition-opacity duration-150"></canvas>
         
-        <!-- 画像情報バッジ -->
         <div id="imageInfoBadge" class="hidden absolute top-2.5 left-2.5 bg-gray-900/80 backdrop-blur border border-gray-700/80 text-[11px] text-gray-300 px-2.5 py-1 rounded-md flex items-center gap-2">
           <span id="infoResolution">-- × --</span>
           <span class="text-gray-600">|</span>
           <span id="infoIndex">1 / 1</span>
         </div>
 
-        <!-- 全消去ボタン -->
         <button id="clearAllBtn" class="hidden absolute top-2.5 right-2.5 bg-gray-900/80 hover:bg-red-950/90 text-gray-400 hover:text-red-300 backdrop-blur border border-gray-700/80 text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1 transition">
           <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
           <span>すべてクリア</span>
         </button>
       </div>
 
-      <!-- 複数枚のサムネイル一覧バー -->
       <div id="thumbnailBar" class="hidden bg-gray-900/95 border-t border-gray-800 px-3 py-1.5 shrink-0">
-        <div id="thumbnailList" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-          <!-- JSでサムネイルを動的に挿入 -->
-        </div>
+        <div id="thumbnailList" class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5"></div>
       </div>
     </main>
 
-    <!-- 右側（縦画面では下側）：コントロールUIパネル -->
     <section class="control-sidebar bg-gray-900 shrink-0 z-20 flex flex-col">
-      
-      <!-- モード切替タブ -->
       <div class="grid grid-cols-3 border-b border-gray-800 text-xs font-semibold bg-gray-950/50 shrink-0">
         <button data-tab="color" class="tab-btn py-2.5 flex items-center justify-center gap-1 border-b-2 border-blue-500 text-blue-400 bg-gray-900/60">
           <i data-lucide="palette" class="w-3.5 h-3.5"></i>
@@ -157,10 +123,7 @@
         </button>
       </div>
 
-      <!-- コントロール内容 -->
       <div class="p-3.5 overflow-y-auto space-y-3.5 text-xs flex-1">
-
-        <!-- 共通：フチの太さスライダー（常に表示） -->
         <div class="bg-gray-800/60 border border-gray-800 rounded-xl p-3">
           <div class="flex justify-between items-center mb-1.5">
             <span class="font-semibold text-gray-200 flex items-center gap-1.5">
@@ -172,7 +135,6 @@
           <input id="borderWidthSlider" type="range" min="0" max="35" step="0.5" value="8" class="w-full h-2 bg-gray-700 rounded-lg cursor-pointer">
         </div>
 
-        <!-- タブ1：単色＆自動抽出5色 -->
         <div id="tab-color" class="tab-panel space-y-3.5">
           <div class="space-y-2">
             <span class="text-gray-400 font-medium block">定番カラー & 自由選択</span>
@@ -183,7 +145,6 @@
               <button data-color="#18181B" class="preset-color-btn w-7 h-7 rounded-full bg-zinc-900 border border-gray-600" title="ダークグレー"></button>
               <button data-color="#000000" class="preset-color-btn w-7 h-7 rounded-full bg-black border border-gray-600" title="黒 (#000000)"></button>
               
-              <!-- カラーピッカー -->
               <label class="relative flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-tr from-pink-500 via-yellow-400 to-cyan-400 p-0.5 cursor-pointer shadow">
                 <span class="w-full h-full rounded-full bg-gray-900 flex items-center justify-center">
                   <i data-lucide="pipette" class="w-3.5 h-3.5 text-white"></i>
@@ -193,7 +154,6 @@
             </div>
           </div>
 
-          <!-- 写真から自動抽出した5色 -->
           <div class="bg-gray-950/60 border border-gray-800/80 rounded-xl p-3 space-y-2.5">
             <div class="flex items-center justify-between gap-1">
               <span class="text-gray-300 font-medium flex items-center gap-1.5">
@@ -213,16 +173,13 @@
           </div>
         </div>
 
-        <!-- タブ2：写真をぼかしたフチ -->
         <div id="tab-blur" class="tab-panel hidden space-y-3">
           <div class="flex items-center justify-between bg-blue-950/40 border border-blue-800/50 rounded-xl px-3 py-2.5">
             <div>
               <p class="font-semibold text-blue-200">背景ぼかしフチモード</p>
               <p class="text-[11px] text-blue-300/80">写真自身を拡大してぼかした背景をフチにします</p>
             </div>
-            <span class="bg-blue-600 text-white font-semibold px-2.5 py-1 rounded-lg text-[11px] shrink-0">
-              適用中
-            </span>
+            <span class="bg-blue-600 text-white font-semibold px-2.5 py-1 rounded-lg text-[11px] shrink-0">適用中</span>
           </div>
 
           <div class="space-y-2.5">
@@ -244,7 +201,6 @@
           </div>
         </div>
 
-        <!-- タブ3：比率計算・角丸・ドロップシャドウ -->
         <div id="tab-size" class="tab-panel hidden space-y-3">
           <div class="bg-gray-800/50 p-2.5 rounded-xl border border-gray-800 space-y-1.5">
             <span class="text-gray-300 font-medium block">比率と距離のルール</span>
@@ -284,7 +240,6 @@
 
   </div>
 
-  <!-- 一括保存モーダル -->
   <div id="exportModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-gray-900 border border-gray-800 rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between">
@@ -297,7 +252,6 @@
         </button>
       </div>
 
-      <!-- 進捗表示 -->
       <div id="exportProgressArea" class="hidden space-y-2 py-2">
         <div class="flex justify-between text-xs text-gray-300">
           <span id="exportProgressText">高画質で処理中...</span>
@@ -308,7 +262,6 @@
         </div>
       </div>
 
-      <!-- 保存方法の選択ボタン -->
       <div id="exportActionsArea" class="space-y-2.5">
         <p class="text-xs text-gray-400">元の高解像度を維持したまま書き出します（<span id="modalPhotoCount">1</span>枚）</p>
         
@@ -586,34 +539,24 @@
       ctx.closePath();
     }
 
-    // プレビュー領域の空きサイズに合わせてキャンバスを最大化フィット表示させる
-    function fitCanvasToContainer() {
-      if (!previewCanvas.width || !previewCanvas.height) return;
-      const rect = previewContainer.getBoundingClientRect();
-      const availW = Math.max(50, rect.width - 24);
-      const availH = Math.max(50, rect.height - 24);
-      const imgAspect = previewCanvas.width / previewCanvas.height;
-      const boxAspect = availW / availH;
-
-      if (imgAspect > boxAspect) {
-        previewCanvas.style.width = `${availW}px`;
-        previewCanvas.style.height = `${availW / imgAspect}px`;
-      } else {
-        previewCanvas.style.height = `${availH}px`;
-        previewCanvas.style.width = `${availH * imgAspect}px`;
-      }
-    }
-
-    window.addEventListener('resize', fitCanvasToContainer);
-
+    // プレビュー表示時に画面領域いっぱいにキャンバスが大きく表示されるように自動調整
     function renderPreview() {
       if (!state.photos.length) return;
       const current = state.photos[state.currentIndex];
-      const info = renderPhotoWithFrame(previewCanvas, current, 1600);
-      fitCanvasToContainer();
+      
+      // プレビュー用に解像度を適切に抑えることで綺麗に大きく表示させる
+      const containerW = previewContainer.clientWidth - 32;
+      const containerH = previewContainer.clientHeight - 32;
+      const maxDim = Math.max(containerW, containerH, 1000);
+
+      const info = renderPhotoWithFrame(previewCanvas, current, maxDim);
       infoResolution.textContent = `出力: ${info.totalW} × ${info.totalH}px`;
       infoIndex.textContent = `${state.currentIndex + 1} / ${state.photos.length}枚目`;
     }
+
+    window.addEventListener('resize', () => {
+      if (state.photos.length > 0) renderPreview();
+    });
 
     function renderThumbnails() {
       thumbnailList.innerHTML = '';
