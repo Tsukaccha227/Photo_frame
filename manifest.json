@@ -1,10 +1,9 @@
 {
-  "id": "/Photo_frame/",
   "name": "PhotoFrame Studio",
   "short_name": "フチ付け",
   "description": "一括写真フチ付けアプリ",
-  "start_url": "/Photo_frame/",
-  "scope": "/Photo_frame/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#111827",
   "theme_color": "#111827",
