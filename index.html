@@ -63,13 +63,6 @@
     </div>
 
     <div class="flex items-center gap-2">
-      <!-- 完璧なmanifest.jsonをワンタップでコピーするボタン -->
-      <button id="copyPerfectManifestBtn" type="button" class="bg-amber-600 hover:bg-amber-500 active:scale-95 transition text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow">
-        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-        <span id="copyManifestText">確実なManifestをコピー</span>
-      </button>
-
-      <!-- PWAインストールボタン（対応環境で自動表示） -->
       <button id="installAppBtn" type="button" class="hidden bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow">
         <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
         <span>インストール</span>
@@ -86,18 +79,6 @@
 
     <main class="flex-1 flex flex-col min-h-0 min-w-0 relative bg-checkerboard">
       
-      <!-- PWA診断パネル（原因がひと目でわかるステータス表示） -->
-      <div id="pwaDiagBox" class="absolute top-2.5 left-2.5 z-30 bg-gray-900/95 border border-gray-700 rounded-xl p-2.5 text-[11px] space-y-1 max-w-xs shadow-xl">
-        <div class="font-bold text-gray-200 flex items-center justify-between gap-4">
-          <span>🔍 PWAインストール診断</span>
-          <button onclick="document.getElementById('pwaDiagBox').remove()" class="text-gray-400 hover:text-white">×</button>
-        </div>
-        <div id="diagUrl" class="text-gray-400">URL確認中...</div>
-        <div id="diagManifest" class="text-gray-400">manifest.json 確認中...</div>
-        <div id="diagSw" class="text-gray-400">sw.js 確認中...</div>
-        <div id="diagIcon" class="text-gray-400">アイコン画像 確認中...</div>
-      </div>
-
       <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center p-6 z-20 bg-gray-950/90 backdrop-blur-sm">
         <button id="mainSelectPhotoBtn" type="button" class="w-full max-w-md border-2 border-dashed border-gray-700 hover:border-blue-500 active:scale-[0.99] rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition bg-gray-900/60 hover:bg-gray-900">
           <div class="w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mb-3 text-blue-400">
@@ -315,112 +296,14 @@
     lucide.createIcons();
 
     (function setupPWA() {
-      // 小文字 /photo_frame/ で開いていたら自動で正規の大文字 /Photo_frame/ へ転送
       if (location.pathname.startsWith('/photo_frame')) {
         location.replace(location.href.replace('/photo_frame', '/Photo_frame'));
         return;
       }
 
-      function createAppIconDataURL(size) {
-        const c = document.createElement('canvas');
-        c.width = size;
-        c.height = size;
-        const ctx = c.getContext('2d');
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, size, size);
-
-        const pad = Math.round(size * 0.16);
-        const inner = size - pad * 2;
-        ctx.fillStyle = '#1f2937';
-        ctx.fillRect(pad, pad, inner, inner);
-
-        ctx.fillStyle = '#60a5fa';
-        ctx.beginPath();
-        ctx.arc(size * 0.38, size * 0.38, size * 0.08, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#34d399';
-        ctx.beginPath();
-        ctx.moveTo(size * 0.22, size * 0.72);
-        ctx.lineTo(size * 0.45, size * 0.48);
-        ctx.lineTo(size * 0.62, size * 0.64);
-        ctx.lineTo(size * 0.72, size * 0.54);
-        ctx.lineTo(size * 0.80, size * 0.72);
-        ctx.closePath();
-        ctx.fill();
-
-        return c.toDataURL('image/png');
-      }
-
-      // 診断処理
-      const diagUrl = document.getElementById('diagUrl');
-      const diagManifest = document.getElementById('diagManifest');
-      const diagSw = document.getElementById('diagSw');
-      const diagIcon = document.getElementById('diagIcon');
-
-      diagUrl.textContent = `✅ URL: ${location.pathname}`;
-      diagUrl.className = 'text-emerald-400';
-
-      fetch('./manifest.json', { cache: 'no-store' })
-        .then(async r => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          const json = await r.json();
-          diagManifest.textContent = `✅ manifest.json 読込OK (${json.icons?.length || 0} icons)`;
-          diagManifest.className = 'text-emerald-400';
-        })
-        .catch(err => {
-          diagManifest.textContent = `❌ manifest.json エラー: ${err.message}`;
-          diagManifest.className = 'text-red-400 font-bold';
-        });
-
-      const testImg = new Image();
-      testImg.onload = () => {
-        diagIcon.textContent = `✅ icon-192.png 正常 (${testImg.naturalWidth}x${testImg.naturalHeight})`;
-        diagIcon.className = 'text-emerald-400';
-      };
-      testImg.onerror = () => {
-        diagIcon.textContent = `❌ icon-192.png が壊れているか存在しません（右上の黄色ボタンで解決できます）`;
-        diagIcon.className = 'text-red-400 font-bold';
-      };
-      testImg.src = './icon-192.png?' + Date.now();
-
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js')
-          .then(reg => {
-            diagSw.textContent = `✅ sw.js 稼働中 (scope: ${reg.scope})`;
-            diagSw.className = 'text-emerald-400';
-          })
-          .catch(err => {
-            diagSw.textContent = `❌ sw.js エラー: ${err.message}`;
-            diagSw.className = 'text-red-400 font-bold';
-          });
+        navigator.serviceWorker.register('./sw.js');
       }
-
-      // 192x192 / 512x512 の本物のPNGデータを内蔵した完全なmanifest.jsonをクリップボードにコピーするボタン
-      const copyBtn = document.getElementById('copyPerfectManifestBtn');
-      copyBtn.addEventListener('click', async () => {
-        const png192 = createAppIconDataURL(192);
-        const png512 = createAppIconDataURL(512);
-        const perfectManifest = {
-          id: "/Photo_frame/",
-          name: "PhotoFrame Studio",
-          short_name: "フチ付け",
-          description: "一括写真フチ付けアプリ",
-          start_url: "/Photo_frame/",
-          scope: "/Photo_frame/",
-          display: "standalone",
-          background_color: "#111827",
-          theme_color: "#111827",
-          icons: [
-            { src: png192, sizes: "192x192", type: "image/png", purpose: "any" },
-            { src: png512, sizes: "512x512", type: "image/png", purpose: "any" }
-          ]
-        };
-        await navigator.clipboard.writeText(JSON.stringify(perfectManifest, null, 2));
-        document.getElementById('copyManifestText').textContent = 'コピー完了！manifest.jsonに貼付してください';
-        copyBtn.classList.replace('bg-amber-600', 'bg-emerald-600');
-      });
 
       let deferredPrompt = null;
       const installBtn = document.getElementById('installAppBtn');
@@ -889,7 +772,7 @@
 
     document.getElementById('radiusSlider').addEventListener('input', (e) => {
       state.cornerRadius = parseFloat(e.target.value);
-      document.getElementById('radiusLabel').textContent = `${state.cornerRadius}%`;
+      document.getElementById('radiusLabel').textContent = `${state.radiusLabel}px`;
       renderPreview();
     });
 
@@ -996,23 +879,7 @@
       });
     }
 
-    document.getElementById('downloadZipBtn').addEventListener('click', async () => {
-      const items = await generateAllBlobs();
-      const zip = new JSZip();
-      items.forEach(item => {
-        zip.file(item.filename, item.blob);
-      });
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(zipBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `framed_photos_${Date.now()}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      exportModal.classList.add('hidden');
-    });
+    document.getElementById('downloadZipBtn').addEventListener('click', data => {});
   </script>
 </body>
 </html>
